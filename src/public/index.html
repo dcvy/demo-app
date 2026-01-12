@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Realtime Post Activities</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+</head>
+<body>
+
+    <div class="container">
+        <div class="config-section">
+            <h3>Cấu hình Test</h3>
+            
+            <div class="input-group">
+                <label>ID Bài viết:</label><br>
+                <input id="inputPostId" type="text" placeholder="Dán MongoDB ID...">
+                <button onclick="joinRoom()">Vào phòng</button>
+            </div>
+
+            <div class="input-group">
+                <label>JWT Token:</label><br>
+                <input id="inputToken" type="password" placeholder="Dán Token từ Postman...">
+                <button onclick="saveToken()">Lưu Token</button>
+                <p id="tokenStatus"></p>
+            </div>
+            
+            <p id="roomStatus">Chưa kết nối bài viết nào</p>
+        </div>
+
+        <div>
+            <h2 id="displayPostTitle">Bài viết: (Chưa chọn)</h2>
+            <p>
+                Điểm trung bình: <span id="avgRating" class="rating-badge">0.0</span> | 
+                Hạng: <span id="rank" class="rank-badge"></span>
+            </p>
+        </div>
+
+        <div id="commentList" class="comment-box">
+            <p>Chưa có dữ liệu realtime...</p>
+        </div>
+
+        <div>
+            <h3>Gửi đánh giá mới</h3>
+            <div class="input-group">
+                <input id="content" type="text" placeholder="Nội dung bình luận...">
+            </div>
+            
+            <div class="input-group">
+                <label>Số sao:</label>
+                <select id="rating">
+                    <option value="5">5 sao</option>
+                    <option value="4">4 sao</option>
+                    <option value="3">3 sao</option>
+                    <option value="2">2 sao</option>
+                    <option value="1">1 sao</option>
+                </select>
+                <button onclick="sendActivity()">GỬI</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io(); // Kết nối tới server
+        let CURRENT_POST_ID = localStorage.getItem("lastPostId") || "";
+
+        // Khi mở trang, tự động điền dữ liệu cũ
+        window.onload = () => {
+            const savedToken = localStorage.getItem("test_token");
+            if(savedToken) {
+                document.getElementById("inputToken").value = savedToken;
+                updateTokenStatus(true);
+            }
+            if(CURRENT_POST_ID) {
+                document.getElementById("inputPostId").value = CURRENT_POST_ID;
+                joinRoom(); // Tự động vào phòng cũ
+            }
+        };
+
+        function saveToken() {
+            const token = document.getElementById("inputToken").value.trim();
+            if(!token) return alert("Hãy dán token vào!");
+            localStorage.setItem("test_token", token);
+            updateTokenStatus(true);
+            alert("Đã lưu token!");
+        }
+
+        function updateTokenStatus(isSaved) {
+            const status = document.getElementById("tokenStatus");
+            status.innerText = isSaved ? "Đã lưu token" : "❌ Chưa có token";
+            status.style.color = isSaved ? "lightgreen" : "red";
+        }
+
+        function joinRoom() {
+            const id = document.getElementById("inputPostId").value.trim();
+            if(!id) return alert("Hãy nhập Post ID!");
+
+            // Rời phòng cũ nếu có
+            if(CURRENT_POST_ID && CURRENT_POST_ID !== id) {
+                socket.emit("leave_post", CURRENT_POST_ID); 
+            }
+
+            CURRENT_POST_ID = id;
+            localStorage.setItem("lastPostId", id);
+            socket.emit("join_post", CURRENT_POST_ID);
+
+            document.getElementById("displayPostTitle").innerText = "Bài viết: " + CURRENT_POST_ID;
+            document.getElementById("roomStatus").innerText = "Đang lắng nghe: " + CURRENT_POST_ID;
+        }
+
+        // Lắng nghe dữ liệu realtime từ Server
+        socket.on("NEW_COMMENT_EVENT", (data) => {
+            const list = document.getElementById("commentList");
+            
+            // Xóa thông báo trống
+            if (list.innerText.includes("Chưa có dữ liệu")) list.innerHTML = "";
+
+            const item = document.createElement("div");
+            item.className = "comment-item";
+            item.innerHTML = `
+                <b>${data.author || 'Ẩn danh'}:</b> ${data.content} 
+                <span class="rating-badge">(${data.rating} ⭐)</span>
+            `;
+            list.prepend(item); // Hiện lên đầu
+
+            // Cập nhật số sao và hạng bài viết
+            document.getElementById("avgRating").innerText = data.avgRating;
+            document.getElementById("rank").innerText = data.rank;
+        });
+
+        // Hàm gọi API gửi dữ liệu
+        async function sendActivity() {
+            const content = document.getElementById("content").value;
+            const rating = document.getElementById("rating").value;
+            const token = localStorage.getItem("test_token");
+
+            if(!CURRENT_POST_ID) return alert("Vui lòng nhấn 'Vào phòng' trước!");
+            if(!token) return alert("Hãy lưu Token trước!");
+            if(!content) return alert("Nhập nội dung!");
+
+            try {
+                const response = await fetch("/activities", {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer " + token
+                    },
+                    body: JSON.stringify({
+                        postId: CURRENT_POST_ID,
+                        content,
+                        rating: parseInt(rating)
+                    })
+                });
+
+                if (response.ok) {
+                    document.getElementById("content").value = "";
+                } else {
+                    const error = await response.json();
+                    alert("Lỗi: " + error.message);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Không thể kết nối API");
+            }
+        }
+    </script>
+</body>
+</html>
