@@ -8,6 +8,9 @@ import { errorHandler } from "./utils/middlewares/error.middleware";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "path";
+import { seedAuthData } from "./seeder";
+import swaggerUi from "swagger-ui-express";
+import { specs } from "./swagger";
 
 dotenv.config();
 
@@ -37,6 +40,10 @@ io.on("connection", (socket) => {
 app.set("io", io);
 app.use(express.json());
 
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
+// console.log("--- SWAGGER DEBUG ---");
+// console.log(JSON.stringify((specs as any).paths, null, 2));
+
 app.get("/demo", (req, res) => {
   const filePath = path.join(__dirname, "../src/public/index.html");
   console.log("🚀 ~ filePath:", filePath);
@@ -59,6 +66,8 @@ setupRoutes(app);
 app.use(errorHandler);
 
 app.use(express.static(path.join(process.cwd(), "/src/public")));
+
+seedAuthData();
 
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
