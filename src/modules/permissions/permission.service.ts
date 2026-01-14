@@ -1,47 +1,33 @@
-import { getEnforcer } from "../../casbin";
-import { IAssignPermissionDTO, IAssignRoleDTO } from "./permission.interface";
+import casbinInstance from "../../casbin";
 
 export class PermissionService {
-  static async addPolicy(
+  static async addPolicies(
     subjectId: string,
     object: string,
     action: string | string[]
   ) {
-    const enforcer = await getEnforcer();
-
+    const enforcer = casbinInstance.enforcer;
     const actions =
       typeof action === "string"
         ? action.split(",").map((a) => a.trim().toUpperCase())
         : action;
 
     const rules = actions.map((act) => [subjectId, object, act]);
-
     const result = await enforcer.addPolicies(rules);
-    const isSuccess = Array.isArray(result)
-      ? result.some((r) => r === true)
-      : result;
 
-    if (isSuccess) {
-      await enforcer.savePolicy();
-      return true;
-    }
-    return false;
+    if (result) await enforcer.savePolicy();
+    return result;
   }
 
-  static async addGroupingPolicy(username: string, groupId: string) {
-    const enforcer = await getEnforcer();
-
+  static async addGrouping(username: string, groupId: string) {
+    const enforcer = casbinInstance.enforcer;
     const success = await enforcer.addGroupingPolicy(username, groupId);
-
-    if (success) {
-      await enforcer.savePolicy();
-      return true;
-    }
-    return false;
+    if (success) await enforcer.savePolicy();
+    return success;
   }
 
   static async getRules() {
-    const enforcer = await getEnforcer();
+    const enforcer = casbinInstance.enforcer;
     return {
       policies: await enforcer.getPolicy(),
       groupingPolicies: await enforcer.getGroupingPolicy(),

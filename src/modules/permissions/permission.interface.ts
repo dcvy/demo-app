@@ -1,3 +1,4 @@
+import { RouterHandle } from "../../utils/routerHandle.type";
 export interface IAssignPermissionDTO {
   subject: string;
   object: string;
@@ -7,4 +8,16 @@ export interface IAssignPermissionDTO {
 export interface IAssignRoleDTO {
   username: string;
   groupName: string;
+}
+
+export namespace PermissionSpace {
+  export type AssignRoleController = RouterHandle<{
+    body: IAssignRoleDTO;
+  }>;
+
+  export type AssignPermissionController = RouterHandle<{
+    body: IAssignPermissionDTO;
+  }>;
+
+  export type GetAllController = RouterHandle<{}>;
 }

@@ -1,9 +1,13 @@
 import { Application } from "express";
-import { PermissionController } from "./permission.controller";
 import {
-  verifyToken,
   checkPermission,
+  verifyToken,
 } from "../../utils/middlewares/auth.middleware";
+import {
+  assignPermissionToGroupAction,
+  assignRoleToUserAction,
+  getAllPermissionsAction,
+} from "./permission.controller";
 
 /**
  * @swagger
@@ -125,20 +129,20 @@ export default (app: Application) => {
     "/permissions/assign-group",
     verifyToken,
     checkPermission,
-    PermissionController.assignPermissionToGroup
+    assignPermissionToGroupAction
   );
 
   app.post(
     "/permissions/assign-user",
     verifyToken,
     checkPermission,
-    PermissionController.assignRoleToUser
+    assignRoleToUserAction
   );
 
   app.get(
     "/permissions",
     verifyToken,
     checkPermission,
-    PermissionController.getAllPermissions
+    getAllPermissionsAction
   );
 };

@@ -1,7 +1,8 @@
-import { Request, Response, NextFunction } from "express";
+import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import casbinInstance from "../../casbin";
 import { User } from "../../modules/users/user.collection";
-import { getEnforcer } from "../../casbin";
+import { httpResponse } from "../../utils/httpResponse.core";
 
 export const verifyToken = async (
   req: Request,
@@ -15,25 +16,22 @@ export const verifyToken = async (
       : null;
 
   if (!token) {
-    return res.status(401).json({
-      message: "Bạn cần đăng nhập để truy cập!",
-    });
+    return httpResponse.unauthorized(res, "Bạn cần đăng nhập để truy cập!");
   }
 
   try {
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      throw new Error("JWT_SECRET chưa được cấu hình");
-    }
+    const secret = process.env.JWT_SECRET || "secret";
     const decoded = jwt.verify(token, secret) as any;
+
     const user = await User.findOne({ username: decoded.username }).select(
       "-password"
     );
 
     if (!user) {
-      return res.status(401).json({
-        message: "Người dùng không tồn tại hoặc token không hợp lệ!",
-      });
+      return httpResponse.unauthorized(
+        res,
+        "Người dùng không tồn tại hoặc token không hợp lệ!"
+      );
     }
 
     (req as any).user = {
@@ -45,9 +43,7 @@ export const verifyToken = async (
     next();
   } catch (error) {
     console.error("Verify token error:", error);
-    return res.status(403).json({
-      message: "Token không hợp lệ hoặc đã hết hạn!",
-    });
+    return httpResponse.forbidden(res, "Token không hợp lệ hoặc đã hết hạn!");
   }
 };
 
@@ -59,21 +55,25 @@ export const checkPermission = async (
   const user = (req as any).user;
 
   if (!user) {
-    return res.status(401).json({ message: "Unauthorized" });
+    return httpResponse.unauthorized(res, "Unauthorized");
   }
 
   try {
-    const enforcer = await getEnforcer();
+    const enforcer = casbinInstance.enforcer;
 
     const sub = user.username;
-    const obj = req.baseUrl + req.path;
-    const act = req.method;
+    // Sử dụng req.baseUrl + req.route.path để lấy path định danh (ví dụ: /api/users/:id)
+    // thay vì path thực tế (/api/users/65a...) để khớp với policy trong Casbin
+    const obj = req.baseUrl + (req.route?.path || req.path);
+    const act = req.method.toUpperCase();
 
+    // Tự động đồng bộ Grouping Policy nếu trong DB có mà Casbin chưa có
     if (user.userGroup && Array.isArray(user.userGroup)) {
       for (const groupId of user.userGroup) {
-        const hasG = await enforcer.hasGroupingPolicy(sub, groupId.toString());
+        const groupName = groupId.toString();
+        const hasG = await enforcer.hasGroupingPolicy(sub, groupName);
         if (!hasG) {
-          await enforcer.addGroupingPolicy(sub, groupId.toString());
+          await enforcer.addGroupingPolicy(sub, groupName);
         }
       }
     }
@@ -82,7 +82,9 @@ export const checkPermission = async (
 
     if (process.env.NODE_ENV !== "production") {
       console.log(
-        `Check: Sub=${sub}, Obj=${obj}, Act=${act} => Allowed=${allowed}`
+        `[Casbin] Sub: ${sub} | Obj: ${obj} | Act: ${act} => ${
+          allowed ? "ALLOWED" : "DENIED"
+        }`
       );
     }
 
@@ -90,11 +92,12 @@ export const checkPermission = async (
       return next();
     }
 
-    return res.status(403).json({
-      message: "Bạn không có quyền thực hiện hành động này",
-    });
+    return httpResponse.forbidden(
+      res,
+      "Bạn không có quyền thực hiện hành động này"
+    );
   } catch (error) {
     console.error("Casbin enforce error:", error);
-    return res.status(500).json({ message: "Lỗi kiểm tra quyền" });
+    return httpResponse.serverError(res, "Lỗi kiểm tra quyền hạn");
   }
 };

@@ -1,9 +1,15 @@
 import { Application } from "express";
-import { UserController } from "./user.controller";
 import {
-  verifyToken,
   checkPermission,
+  verifyToken,
 } from "../../utils/middlewares/auth.middleware";
+import {
+  createUserAction,
+  deleteUserAction,
+  getUserByIdAction,
+  getUsersAction,
+  updateUserAction,
+} from "./user.controller";
 
 /**
  * @swagger
@@ -122,14 +128,9 @@ import {
  */
 
 export default (app: Application): void => {
-  app.get("/users", verifyToken, checkPermission, UserController.getUsers);
-  app.get(
-    "/users/:id",
-    verifyToken,
-    checkPermission,
-    UserController.getUserById
-  );
-  app.post("/users", verifyToken, checkPermission, UserController.create);
-  app.put("/users/:id", verifyToken, checkPermission, UserController.update);
-  app.delete("/users/:id", verifyToken, checkPermission, UserController.delete);
+  app.get("/users", verifyToken, checkPermission, getUsersAction);
+  app.get("/users/:id", verifyToken, checkPermission, getUserByIdAction);
+  app.post("/users", verifyToken, checkPermission, createUserAction);
+  app.put("/users/:id", verifyToken, checkPermission, updateUserAction);
+  app.delete("/users/:id", verifyToken, checkPermission, deleteUserAction);
 };

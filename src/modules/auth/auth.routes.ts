@@ -1,6 +1,13 @@
 import { Application } from "express";
 import { body } from "express-validator";
-import { AuthController } from "./auth.controller";
+import {
+  forgotPasswordAction,
+  loginAction,
+  logoutAction,
+  registerAction,
+  renderLoginPageAction,
+  renderRegisterPageAction,
+} from "./auth.controller";
 
 /**
  * @swagger
@@ -114,8 +121,8 @@ import { AuthController } from "./auth.controller";
  *         description: Đăng xuất thành công
  */
 export default (app: Application) => {
-  app.get("/be/login", AuthController.renderLoginPage);
-  app.get("/be/register", AuthController.renderRegisterPage);
+  app.get("/be/login", renderLoginPageAction);
+  app.get("/be/register", renderRegisterPageAction);
 
   app.post(
     "/register",
@@ -130,16 +137,16 @@ export default (app: Application) => {
         return true;
       }),
     ],
-    AuthController.register
+    registerAction
   );
 
-  app.post("/login", AuthController.login);
+  app.post("/login", loginAction);
 
   app.post(
     "/forgot-password",
     [body("email").isEmail().withMessage("Vui lòng nhập email hợp lệ")],
-    AuthController.forgotPassword
+    forgotPasswordAction
   );
 
-  app.post("/logout", AuthController.logout);
+  app.post("/logout", logoutAction);
 };

@@ -1,28 +1,20 @@
-import { IUser, ICreateUserDTO, IUpdateUserDTO } from "./user.interface";
 import { User } from "./user.collection";
-import { IUserResponse } from "../users/user.interface";
-import { Types } from "mongoose";
+import { IUpdateUserDTO, IUserResponse } from "./user.interface";
 
 export class UserService {
   static async getAllUsers(): Promise<IUserResponse[]> {
-    return await User.find().lean();
+    return await User.find().sort({ createdAt: -1 }).lean();
   }
 
   static async getUserById(id: string): Promise<IUserResponse | null> {
     return await User.findById(id).lean();
   }
 
-  static async createUser(data: ICreateUserDTO): Promise<IUserResponse> {
-    const formattedData = {
-      ...data,
-      userGroup: data.userGroup
-        ? data.userGroup.map((id) => new Types.ObjectId(id))
-        : [],
-    };
-
-    const newUser = await User.create(formattedData);
+  static async createUser(data: any): Promise<IUserResponse> {
+    const newUser = await User.create(data);
     return newUser.toObject() as IUserResponse;
   }
+
   static async updateUser(
     id: string,
     data: IUpdateUserDTO

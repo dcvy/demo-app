@@ -1,151 +1,140 @@
-import { Request, Response, NextFunction } from "express";
-import { validationResult } from "express-validator";
-import { UserService } from "./user.service";
-import { getEnforcer } from "../../casbin";
-import {
-  ICreateUserDTO,
-  IUpdateUserDTO,
-  IUserResponse,
-} from "./user.interface";
 import bcrypt from "bcryptjs";
+import { validationResult } from "express-validator";
+import { Types } from "mongoose";
+import casbinInstance from "../../casbin";
+import { httpResponse } from "../../utils/httpResponse.core";
+import { UserSpace } from "./user.interface";
+import { UserService } from "./user.service";
 
-export class UserController {
-  static async getUsers(req: Request, res: Response, next: NextFunction) {
-    try {
-      const users: IUserResponse[] = await UserService.getAllUsers();
-      res.status(200).json({ success: true, data: users });
-    } catch (error) {
-      next({ status: 500, message: "Lỗi khi lấy danh sách người dùng", error });
-    }
+export const getUsersAction: UserSpace.GetAllController = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const users = await UserService.getAllUsers();
+    httpResponse.success(res, users);
+  } catch (error) {
+    next(error);
   }
+};
 
-  static async getUserById(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ message: "Thiếu User ID" });
-      }
-      const user: IUserResponse | null = await UserService.getUserById(id);
+export const getUserByIdAction: UserSpace.GetByIdController = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const { id } = req.params;
+    const user = await UserService.getUserById(id);
 
-      if (!user) {
-        return res
-          .status(404)
-          .json({ success: false, message: "Không tìm thấy người dùng" });
-      }
+    if (!user) return httpResponse.notFound(res, "Không tìm thấy người dùng");
 
-      res.status(200).json({ success: true, data: user });
-    } catch (error) {
-      next({ status: 400, message: "ID không hợp lệ", error });
-    }
+    httpResponse.success(res, user);
+  } catch (error) {
+    next(error);
   }
+};
 
-  static async create(req: Request, res: Response, next: NextFunction) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ success: false, errors: errors.array() });
-      }
-
-      const data: ICreateUserDTO = req.body;
-      const salt = await bcrypt.genSalt(10);
-      data.password = await bcrypt.hash(data.password, salt);
-      const newUser: IUserResponse = await UserService.createUser(data);
-
-      const groupsToAssign =
-        data.userGroup && data.userGroup.length > 0 ? data.userGroup : [];
-
-      if (groupsToAssign.length > 0) {
-        const enforcer = await getEnforcer();
-
-        await Promise.all(
-          groupsToAssign.map((groupId) =>
-            enforcer.addGroupingPolicy(newUser.username, groupId.toString())
-          )
-        );
-
-        await enforcer.savePolicy();
-      }
-
-      res.status(201).json({
-        success: true,
-        message: "Tạo người dùng thành công và đã phân quyền cho các nhóm",
-        data: newUser,
-      });
-    } catch (error: any) {
-      if (error.code === 11000) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Username hoặc email đã tồn tại" });
-      }
-      next({ status: 500, message: "Lỗi khi tạo người dùng", error });
-    }
-  }
-
-  static async update(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ message: "Thiếu User ID" });
-      }
-      const updateData: IUpdateUserDTO = req.body;
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ success: false, errors: errors.array() });
-      }
-
-      const updatedUser: IUserResponse | null = await UserService.updateUser(
-        id,
-        updateData
+export const createUserAction: UserSpace.CreateController = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty())
+      return httpResponse.badRequest(
+        res,
+        "Dữ liệu không hợp lệ",
+        errors.array()
       );
 
-      if (!updatedUser) {
-        return res
-          .status(404)
-          .json({ success: false, message: "Không tìm thấy người dùng" });
-      }
+    const data = req.body;
 
-      res.status(200).json({
-        success: true,
-        message: "Cập nhật người dùng thành công",
-        data: updatedUser,
-      });
-    } catch (error: any) {
-      if (error.code === 11000) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Username hoặc email đã tồn tại" });
-      }
-      next({ status: 500, message: "Lỗi khi cập nhật người dùng", error });
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(data.password, salt);
+
+    const payload = {
+      ...data,
+      password: hashedPassword,
+      userGroup: data.userGroup
+        ? data.userGroup.map((id) => new Types.ObjectId(id))
+        : [],
+    };
+
+    const newUser = await UserService.createUser(payload);
+
+    if (data.userGroup && data.userGroup.length > 0) {
+      const enforcer = casbinInstance.enforcer;
+      await Promise.all(
+        data.userGroup.map((groupName) =>
+          enforcer.addGroupingPolicy(newUser.username, groupName.toString())
+        )
+      );
+      await enforcer.savePolicy();
     }
+
+    httpResponse.created(
+      res,
+      newUser,
+      "Tạo người dùng và phân quyền thành công"
+    );
+  } catch (error: any) {
+    if (error.code === 11000)
+      return httpResponse.badRequest(res, "Username hoặc email đã tồn tại");
+    next(error);
   }
+};
 
-  static async delete(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ message: "Thiếu User ID" });
-      }
-
-      const deletedUser: IUserResponse | null = await UserService.deleteUser(
-        id
+export const updateUserAction: UserSpace.UpdateController = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const { id } = req.params;
+    const errors = validationResult(req);
+    if (!errors.isEmpty())
+      return httpResponse.badRequest(
+        res,
+        "Dữ liệu không hợp lệ",
+        errors.array()
       );
 
-      if (!deletedUser) {
-        return res.status(404).json({
-          success: false,
-          message: "Không tìm thấy người dùng để xóa",
-        });
-      }
+    const updatedUser = await UserService.updateUser(id, req.body);
+    if (!updatedUser)
+      return httpResponse.notFound(res, "Không tìm thấy người dùng");
 
-      const enforcer = await getEnforcer();
-      await enforcer.removeFilteredGroupingPolicy(0, deletedUser.username);
-
-      res.status(200).json({
-        success: true,
-        message: `Đã xóa người dùng: ${deletedUser.username} và gỡ bỏ quyền hạn.`,
-      });
-    } catch (error) {
-      next({ status: 500, message: "Lỗi khi xóa người dùng", error });
-    }
+    httpResponse.success(res, updatedUser, "Cập nhật thành công");
+  } catch (error: any) {
+    if (error.code === 11000)
+      return httpResponse.badRequest(res, "Username hoặc email đã tồn tại");
+    next(error);
   }
-}
+};
+
+export const deleteUserAction: UserSpace.DeleteController = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const { id } = req.params;
+    const deletedUser = await UserService.deleteUser(id);
+
+    if (!deletedUser)
+      return httpResponse.notFound(res, "Không tìm thấy người dùng để xóa");
+
+    const enforcer = casbinInstance.enforcer;
+    await enforcer.removeFilteredGroupingPolicy(0, deletedUser.username);
+
+    httpResponse.success(
+      res,
+      null,
+      `Đã xóa người dùng: ${deletedUser.username}`
+    );
+  } catch (error) {
+    next(error);
+  }
+};

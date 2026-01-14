@@ -1,0 +1,12 @@
+version: "3.8"
+
+services:
+  swagger-ui:
+    image: swaggerapi/swagger-ui:latest
+    container_name: swagger-ui
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      URL: "http://localhost:3000/swagger.json"
+      VALIDATOR_URL: none

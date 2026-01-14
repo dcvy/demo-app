@@ -1,4 +1,5 @@
 import { Types } from "mongoose";
+import { RouterHandle } from "../../utils/routerHandle.type";
 
 export interface IUser {
   _id?: Types.ObjectId;
@@ -20,7 +21,6 @@ export interface ICreateUserDTO
   fullName: string;
   email: string;
   password: string;
-  // Cho phép nhận mảng chuỗi ID từ Request Body
   userGroup?: string[];
 }
 
@@ -33,3 +33,24 @@ export interface IUpdateUserDTO
 }
 
 export interface IUserResponse extends Omit<IUser, "password"> {}
+
+export namespace UserSpace {
+  export type GetAllController = RouterHandle<{}>;
+
+  export type GetByIdController = RouterHandle<{
+    params: { id: string };
+  }>;
+
+  export type CreateController = RouterHandle<{
+    body: ICreateUserDTO;
+  }>;
+
+  export type UpdateController = RouterHandle<{
+    params: { id: string };
+    body: IUpdateUserDTO;
+  }>;
+
+  export type DeleteController = RouterHandle<{
+    params: { id: string };
+  }>;
+}

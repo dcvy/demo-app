@@ -1,9 +1,15 @@
 import { Application } from "express";
-import { UserGroupController } from "./userGroup.controller";
 import {
   verifyToken,
   checkPermission,
 } from "../../utils/middlewares/auth.middleware";
+import {
+  getUserGroupsAction,
+  getUserGroupByIdAction,
+  createUserGroupAction,
+  updateUserGroupAction,
+  deleteUserGroupAction,
+} from "./userGroup.controller";
 
 /**
  * @swagger
@@ -115,38 +121,28 @@ import {
  */
 
 export default (app: Application): void => {
-  app.get(
-    "/user-groups",
-    verifyToken,
-    checkPermission,
-    UserGroupController.getUserGroups
-  );
+  app.get("/user-groups", verifyToken, checkPermission, getUserGroupsAction);
 
   app.get(
     "/user-groups/:id",
     verifyToken,
     checkPermission,
-    UserGroupController.getUserGroupById
+    getUserGroupByIdAction
   );
 
-  app.post(
-    "/user-groups",
-    verifyToken,
-    checkPermission,
-    UserGroupController.create
-  );
+  app.post("/user-groups", verifyToken, checkPermission, createUserGroupAction);
 
   app.put(
     "/user-groups/:id",
     verifyToken,
     checkPermission,
-    UserGroupController.update
+    updateUserGroupAction
   );
 
   app.delete(
     "/user-groups/:id",
     verifyToken,
     checkPermission,
-    UserGroupController.delete
+    deleteUserGroupAction
   );
 };
