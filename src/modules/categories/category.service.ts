@@ -1,13 +1,13 @@
+import { Category } from "./category.collection";
 import {
   ICategory,
   ICreateCategoryDTO,
   IUpdateCategoryDTO,
 } from "./category.interface";
-import { Category } from "./category.collection";
 
 export class CategoryService {
   static async getAll(): Promise<ICategory[]> {
-    return await Category.find().lean();
+    return await Category.find().sort({ createdAt: -1 }).lean();
   }
 
   static async getById(id: string): Promise<ICategory | null> {

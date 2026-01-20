@@ -18,4 +18,4 @@ RUN ls -la dist/
 EXPOSE 3000
 
 # Chạy bằng file đã build trong folder dist
-CMD ["node", "dist/app.js"]
+CMD ["sh", "-c", "npm run migrate:up && node dist/app.js"]

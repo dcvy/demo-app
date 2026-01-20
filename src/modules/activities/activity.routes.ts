@@ -1,9 +1,20 @@
 import { Application } from "express";
-import { ActivityController } from "./activity.controller";
-import { verifyToken } from "../../utils/middlewares/auth.middleware";
+import {
+  checkPermission,
+  verifyToken,
+} from "../../utils/middlewares/auth.middleware";
+import {
+  createActivityAction,
+  getActivitiesByClothesAction,
+} from "./activity.controller";
 
 export default (app: Application): void => {
-  app.post("/activities", verifyToken, ActivityController.create);
+  app.post("/activities", verifyToken, checkPermission, createActivityAction);
 
-  app.get("/activities/:postId", ActivityController.getByPost);
+  app.get(
+    "/activities/:clothesId",
+    verifyToken,
+    checkPermission,
+    getActivitiesByClothesAction
+  );
 };
