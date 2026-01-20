@@ -1,12 +1,38 @@
 import { Application } from "express";
-import { CategoryController } from "./category.controller";
-import { verifyToken } from "../../utils/middlewares/auth.middleware";
+import {
+  checkPermission,
+  verifyToken,
+} from "../../utils/middlewares/auth.middleware";
+import {
+  createCategoryAction,
+  deleteCategoryAction,
+  getAllCategoriesAction,
+  getCategoryByIdAction,
+  renderCategoryPageAction,
+  updateCategoryAction,
+} from "./category.controller";
 
 export default (app: Application): void => {
-  app.get("/be/categories", CategoryController.renderCategoryPage);
+  app.get("/be/categories", renderCategoryPageAction);
 
-  app.get("/categories", verifyToken, CategoryController.getAll);
-  app.post("/categories", verifyToken, CategoryController.create);
-  app.put("/categories/:id", verifyToken, CategoryController.update);
-  app.delete("/categories/:id", verifyToken, CategoryController.delete);
+  app.get("/categories", verifyToken, checkPermission, getAllCategoriesAction);
+  app.get(
+    "/categories/:id",
+    verifyToken,
+    checkPermission,
+    getCategoryByIdAction
+  );
+  app.post("/categories", verifyToken, checkPermission, createCategoryAction);
+  app.put(
+    "/categories/:id",
+    verifyToken,
+    checkPermission,
+    updateCategoryAction
+  );
+  app.delete(
+    "/categories/:id",
+    verifyToken,
+    checkPermission,
+    deleteCategoryAction
+  );
 };

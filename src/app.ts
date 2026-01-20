@@ -10,8 +10,7 @@ import path from "path";
 import { Server } from "socket.io";
 import swaggerUi from "swagger-ui-express";
 import setupRoutes from "./routes";
-import { seedAuthData } from "./seeder";
-import { specs } from "./swagger";
+import { swaggerDocument } from "./swaggers/index";
 import { errorHandler } from "./utils/middlewares/error.middleware";
 import { requestLogger } from "./utils/middlewares/logger.middleware";
 
@@ -42,19 +41,17 @@ io.on("connection", (socket) => {
 app.set("io", io);
 app.use(express.json());
 
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
-// console.log("--- SWAGGER DEBUG ---");
-// console.log(JSON.stringify((specs as any).paths, null, 2));
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+app.get("/swagger.json", (req, res) => {
+  res.setHeader("Content-Type", "application/json");
+  res.send(swaggerDocument);
+});
 
 app.get("/demo", (req, res) => {
   const filePath = path.join(__dirname, "../src/public/index.html");
   console.log("🚀 ~ filePath:", filePath);
   res.sendFile(filePath);
-});
-
-app.get("/swagger.json", (req, res) => {
-  res.setHeader("Content-Type", "application/json");
-  res.send(specs);
 });
 
 const MONGO_URI = process.env.MONGO_URI;
@@ -67,15 +64,6 @@ mongoose
   .connect(MONGO_URI)
   .then(async () => {
     console.log("✅ Connected to MongoDB");
-
-    // Thực hiện seed dữ liệu ngay sau khi kết nối thành công
-    try {
-      await seedAuthData();
-    } catch (seedError) {
-      console.error("❌ Seed Auth Data Error:", seedError);
-    }
-
-    // Sau khi seed xong mới cho phép server lắng nghe
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on http://localhost:${PORT}`);
@@ -83,7 +71,7 @@ mongoose
   })
   .catch((err) => {
     console.error("❌ MongoDB Connection Error:", err);
-    process.exit(1); // Thoát nếu không kết nối được DB
+    process.exit(1);
   });
 
 setupRoutes(app);

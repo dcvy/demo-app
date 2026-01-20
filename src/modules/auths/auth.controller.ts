@@ -109,7 +109,6 @@ export const forgotPasswordAction: AuthSpace.ForgotPasswordController = async (
     user.password = await bcrypt.hash(newPass, 10);
     await user.save();
 
-    // Ở đây bạn có thể thêm logic gửi mail chứa newPass
     httpResponse.success(res, null, "Mật khẩu mới đã được gửi (giả định)");
   } catch (error) {
     next(error);

@@ -1,60 +1,118 @@
-import { Request, Response, NextFunction } from "express";
-import { CategoryService } from "./category.service";
+import { validationResult } from "express-validator";
 import path from "path";
+import { httpResponse } from "../../utils/httpResponse.core";
+import { CategorySpace } from "./category.interface";
+import { CategoryService } from "./category.service";
 
-export class CategoryController {
-  static renderCategoryPage(req: Request, res: Response) {
-    res.sendFile(path.join(process.cwd(), "/src/public/pages/category.html"));
+export const renderCategoryPageAction: CategorySpace.GetAllController = async (
+  req,
+  res
+) => {
+  res.sendFile(path.join(process.cwd(), "/src/public/pages/category.html"));
+};
+
+export const getAllCategoriesAction: CategorySpace.GetAllController = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const data = await CategoryService.getAll();
+    httpResponse.success(res, data);
+  } catch (error) {
+    next(error);
   }
-  static async getAll(req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = await CategoryService.getAll();
-      res.json({ success: true, data });
-    } catch (error) {
-      next(error);
+};
+
+export const getCategoryByIdAction: CategorySpace.GetByIdController = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const { id } = req.params;
+    const category = await CategoryService.getById(id);
+
+    if (!category) return httpResponse.notFound(res, "Không tìm thấy danh mục");
+
+    httpResponse.success(res, category);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createCategoryAction: CategorySpace.CreateController = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return httpResponse.badRequest(
+        res,
+        "Dữ liệu không hợp lệ",
+        errors.array()
+      );
     }
-  }
 
-  static async create(req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = await CategoryService.create(req.body);
-      res.status(201).json({ success: true, data });
-    } catch (error) {
-      next(error);
+    const data = await CategoryService.create(req.body);
+    httpResponse.created(res, data, "Tạo danh mục thành công");
+  } catch (error: any) {
+    if (error?.name === "MongoServerError" && error?.code === 11000) {
+      return httpResponse.badRequest(res, "Tên danh mục đã tồn tại");
     }
+
+    next(error);
   }
+};
 
-  static async update(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
-
-      if (!id) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Thiếu ID danh mục" });
-      }
-
-      const data = await CategoryService.update(id, req.body);
-      res.json({ success: true, data });
-    } catch (error) {
-      next(error);
+export const updateCategoryAction: CategorySpace.UpdateController = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const { id } = req.params;
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return httpResponse.badRequest(
+        res,
+        "Dữ liệu không hợp lệ",
+        errors.array()
+      );
     }
-  }
 
-  static async delete(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { id } = req.params;
+    const updatedCategory = await CategoryService.update(id, req.body);
 
-      if (!id) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Thiếu ID danh mục" });
-      }
-
-      const data = await CategoryService.delete(id);
-      res.json({ success: true, message: "Xóa danh mục thành công" });
-    } catch (error) {
-      next(error);
+    if (!updatedCategory) {
+      return httpResponse.notFound(res, "Không tìm thấy danh mục để cập nhật");
     }
+
+    httpResponse.success(res, updatedCategory, "Cập nhật thành công");
+  } catch (error: any) {
+    if (error.code === 11000) {
+      return httpResponse.badRequest(res, "Tên danh mục đã tồn tại");
+    }
+    next(error);
   }
-}
+};
+
+export const deleteCategoryAction: CategorySpace.DeleteController = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const { id } = req.params;
+    const deletedCategory = await CategoryService.delete(id);
+
+    if (!deletedCategory) {
+      return httpResponse.notFound(res, "Không tìm thấy danh mục để xóa");
+    }
+
+    httpResponse.success(res, deletedCategory, "Xóa danh mục thành công");
+  } catch (error) {
+    next(error);
+  }
+};

@@ -1,41 +1,56 @@
-import { Response, NextFunction } from "express";
+import { httpResponse } from "../../utils/httpResponse.core";
+import { ActivitySpace } from "./activity.interface";
 import { ActivityService } from "./activity.service";
 
-export class ActivityController {
-  static async create(req: any, res: Response, next: NextFunction) {
+// 1. Create Activity (Comment & Rate)
+export const createActivityAction: ActivitySpace.CreateController = async (
+  req,
+  res,
+  next
+) => {
+  try {
+    const { clothes: clothesName, content, rating } = req.body;
+
+    let clothesId: string;
     try {
-      const userId = req.user.id;
-      const { postId, content, rating } = req.body;
+      clothesId = await ActivityService.findClothesIdByName(clothesName);
+    } catch (error: any) {
+      return httpResponse.badRequest(res, error.message);
+    }
 
-      const result = await ActivityService.create({
-        post: postId,
-        author: userId,
-        content,
-        rating,
-      });
+    const userId = (req as any).user._id;
 
-      const io = req.app.get("io");
-      io.to(postId).emit("NEW_COMMENT_EVENT", {
-        postId: postId,
+    const result = await ActivityService.create({
+      clothes: clothesId,
+      author: userId,
+      content,
+      rating,
+    });
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(clothesId.toString()).emit("NEW_COMMENT_EVENT", {
+        clothesName: clothesName,
         content: result.newActivity.content,
-        rating: result.newActivity.rating,
-        author: req.user.name,
+        author: (req as any).user.fullName || (req as any).user.username,
         avgRating: result.averageRating,
-        rank: result.rank,
       });
-
-      res.status(201).json({ success: true, data: result });
-    } catch (error) {
-      next(error);
     }
-  }
 
-  static async getByPost(req: any, res: Response, next: NextFunction) {
+    httpResponse.created(res, result, "Đã gửi đánh giá thành công");
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getActivitiesByClothesAction: ActivitySpace.GetByClothesIdController =
+  async (req, res, next) => {
     try {
-      const data = await ActivityService.getByPostId(req.params.postId);
-      res.json({ success: true, data });
+      const { clothesId } = req.params;
+      const data = await ActivityService.getByClothesId(clothesId);
+
+      httpResponse.success(res, data);
     } catch (error) {
       next(error);
     }
-  }
-}
+  };

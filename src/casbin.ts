@@ -51,7 +51,7 @@ class Casbin {
         console.log(`Casbin initializing... attempt ${retries + 1}`);
         this.adapter = await MongoAdapter.newAdapter({
           uri: mongoUri,
-          database: "user",
+          database: "shop",
           collection: "casbin_rules",
         });
         this._realEnforcer = await newEnforcer(modelPath, this.adapter);
